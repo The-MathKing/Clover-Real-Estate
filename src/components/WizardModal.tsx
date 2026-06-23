@@ -69,11 +69,30 @@ export const WizardModal: React.FC = () => {
   };
 
   const handleComplete = () => {
+    const newProperty = {
+      id: `prop-${Date.now()}`,
+      address: propertyDetails.address || 'New Presentation',
+      price: propertyDetails.price || '',
+      beds: propertyDetails.beds || '',
+      baths: propertyDetails.baths || '',
+      sqft: propertyDetails.sqft || '',
+      coverImage: images.length > 0 ? images[0].url : 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
+      status: 'Ready' as const,
+      description: propertyDetails.description || '',
+      features: propertyDetails.features || [],
+      images: images.map(img => ({ id: img.id, url: img.url }))
+    };
+
+    useStore.getState().addPropertyToList(newProperty);
+
     setWizardOpen(false);
     setStep(1);
-    // In a full implementation, we'd add this to the list of properties.
-    // For the MVP, this sets the current property session in the store, 
-    // which the parent App component will detect and use to open the player.
+    
+    // Reset wizard fields
+    setPropertyDetails({
+      address: '', price: '', beds: '', baths: '', sqft: '', description: '', features: []
+    });
+    setImages([]);
   };
 
   return (

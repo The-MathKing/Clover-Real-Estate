@@ -10,6 +10,7 @@ export interface Property {
   description: string;
   features: string[];
   script?: string;
+  images?: { id: string, url: string }[];
 }
 
 export const mockProperties: Property[] = [

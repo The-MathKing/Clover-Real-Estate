@@ -1,6 +1,5 @@
 import React from 'react';
 import { Plus, Clock, AlertCircle, CheckCircle, Layers, Video } from 'lucide-react';
-import { mockProperties } from '../mockData';
 import type { Property } from '../mockData';
 import { useStore } from '../store/useStore';
 
@@ -9,7 +8,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectProperty }) => {
-  const { setWizardOpen } = useStore();
+  const { setWizardOpen, propertiesList } = useStore();
 
   const getStatusBadge = (status: Property['status']) => {
     switch (status) {
@@ -86,11 +85,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectProperty }) => {
         <div>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold font-heading text-white">Example Videos</h2>
-            <span className="text-sm text-neutral-400 font-medium">{mockProperties.length} examples</span>
+            <span className="text-sm text-neutral-400 font-medium">{propertiesList.length} examples</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockProperties.map((property) => (
+            {propertiesList.map((property) => (
               <div
                 key={property.id}
                 className="group flex flex-col bg-neutral-900/50 border border-neutral-850 hover:border-neutral-800 rounded-xl overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1"

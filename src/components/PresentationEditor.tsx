@@ -26,14 +26,18 @@ export const PresentationEditor: React.FC<PresentationEditorProps> = ({ property
       features: property.features,
     });
 
-    // Populate timeline with default high-quality unsplash property images for demonstration
-    const sampleImages = [
-      { id: '1', url: property.coverImage },
-      { id: '2', url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80' },
-      { id: '3', url: 'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?auto=format&fit=crop&w=800&q=80' },
-      { id: '4', url: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80' },
-    ];
-    setImages(sampleImages);
+    // Populate timeline with property images if available, else fallback to default high-quality unsplash property images
+    if (property.images && property.images.length > 0) {
+      setImages(property.images);
+    } else {
+      const sampleImages = [
+        { id: '1', url: property.coverImage },
+        { id: '2', url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80' },
+        { id: '3', url: 'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?auto=format&fit=crop&w=800&q=80' },
+        { id: '4', url: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80' },
+      ];
+      setImages(sampleImages);
+    }
 
     // Populate script if exists
     if (property.script) {
