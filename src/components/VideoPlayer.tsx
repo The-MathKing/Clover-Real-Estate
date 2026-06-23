@@ -7,16 +7,26 @@ class AmbientSynthesizer {
   private ctx: AudioContext | null = null;
   private oscillators: OscillatorNode[] = [];
   private gainNode: GainNode | null = null;
+  private destNode: MediaStreamAudioDestinationNode | null = null;
   private isPlaying = false;
   private volume = 0.3;
 
-  start() {
+  start(audioCtx?: AudioContext, dest?: MediaStreamAudioDestinationNode) {
     if (this.isPlaying) return;
-    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    this.ctx = audioCtx || new (window.AudioContext || (window as any).webkitAudioContext)();
     this.gainNode = this.ctx.createGain();
+    
     this.gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
     this.gainNode.gain.linearRampToValueAtTime(this.volume, this.ctx.currentTime + 2);
-    this.gainNode.connect(this.ctx.destination);
+    
+    // Connect to speaker
+    if (!dest) {
+      this.gainNode.connect(this.ctx.destination);
+    } else {
+      // Connect to media stream export destination only
+      this.destNode = dest;
+      this.gainNode.connect(this.destNode);
+    }
 
     // Create a beautiful, warm ambient chord pad (E Maj7 or similar)
     const freqs = [164.81, 220.00, 246.94, 329.63, 440.00]; // E3, A3, B3, E4, A4
@@ -45,9 +55,14 @@ class AmbientSynthesizer {
     if (this.gainNode && this.ctx) {
       this.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
       setTimeout(() => {
-        this.oscillators.forEach(osc => osc.stop());
+        this.oscillators.forEach(osc => {
+          try { osc.stop(); } catch(e){}
+        });
         this.oscillators = [];
-        this.ctx?.close();
+        // Only close if we created it
+        if (!this.destNode) {
+          this.ctx?.close();
+        }
         this.isPlaying = false;
       }, 600);
     }
@@ -62,9 +77,10 @@ class AmbientSynthesizer {
 }
 
 export const VideoPlayer: React.FC = () => {
-  const { images, propertyDetails } = useStore();
+  const { images, propertyDetails, isExporting, setExportProgress, setVideoBlobUrl } = useStore();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const synthRef = useRef<AmbientSynthesizer | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0); // in ms
@@ -100,15 +116,64 @@ export const VideoPlayer: React.FC = () => {
     };
   }, []);
 
-  // Handle play/pause music
+  // Handle play/pause music for normal viewing
   useEffect(() => {
-    if (playing && !muted) {
+    if (isExporting) return; // Managed separately during export
+    if (playing && !muted && audioTrack !== 'none') {
       synthRef.current?.start();
       synthRef.current?.setVolume(0.2);
     } else {
       synthRef.current?.stop();
     }
-  }, [playing, muted]);
+  }, [playing, muted, audioTrack, isExporting]);
+
+  // Handle Export Initialization
+  useEffect(() => {
+    if (isExporting && canvasRef.current) {
+      setPlaying(false);
+      setCurrentTime(0);
+      synthRef.current?.stop();
+
+      const canvas = canvasRef.current;
+      const stream = canvas.captureStream(30);
+
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const dest = audioCtx.createMediaStreamDestination();
+
+      if (audioTrack !== 'none') {
+        const exportSynth = new AmbientSynthesizer();
+        exportSynth.start(audioCtx, dest);
+        exportSynth.setVolume(0.5);
+      }
+
+      // Merge audio track into video stream
+      dest.stream.getAudioTracks().forEach(track => {
+        stream.addTrack(track);
+      });
+
+      const chunks: BlobPart[] = [];
+      const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+      const mediaRecorder = new MediaRecorder(stream, options);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        setVideoBlobUrl(url);
+        audioCtx.close();
+      };
+
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+
+      // Start the export loop
+      lastTimeRef.current = performance.now();
+      setPlaying(true);
+    }
+  }, [isExporting, audioTrack]);
 
   // Animation Loop
   useEffect(() => {
@@ -118,11 +183,9 @@ export const VideoPlayer: React.FC = () => {
     if (!ctx) return;
 
     const render = () => {
-      // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (images.length === 0) {
-        // Draw placeholder state
         ctx.fillStyle = '#171717';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#6b7280';
@@ -133,7 +196,6 @@ export const VideoPlayer: React.FC = () => {
         return;
       }
 
-      // Calculate current slide and transition states
       const slideTime = currentTime % SLIDE_DURATION;
       const currentIdx = Math.floor(currentTime / SLIDE_DURATION) % images.length;
       const nextIdx = (currentIdx + 1) % images.length;
@@ -141,28 +203,22 @@ export const VideoPlayer: React.FC = () => {
       const currentImgObj = images[currentIdx];
       const nextImgObj = images[nextIdx];
 
-      const currentImg = loadedImagesRef.current[currentImgObj.url];
-      const nextImg = loadedImagesRef.current[nextImgObj.url];
+      const currentImg = loadedImagesRef.current[currentImgObj?.url];
+      const nextImg = loadedImagesRef.current[nextImgObj?.url];
 
-      // Draw active image
       if (currentImg) {
         ctx.save();
         drawKenBurnsImage(ctx, canvas, currentImg, slideTime, SLIDE_DURATION, currentIdx);
-        
-        // Draw Overlay Text for active slide
         drawTextOverlay(ctx, canvas, propertyDetails, currentIdx);
         ctx.restore();
       }
 
-      // Handle Cross-fade
       const isCrossFading = slideTime > (SLIDE_DURATION - CROSSFADE_DURATION);
       if (isCrossFading && nextImg) {
         const transitionProgress = (slideTime - (SLIDE_DURATION - CROSSFADE_DURATION)) / CROSSFADE_DURATION;
         ctx.save();
         ctx.globalAlpha = transitionProgress;
         drawKenBurnsImage(ctx, canvas, nextImg, slideTime - (SLIDE_DURATION - CROSSFADE_DURATION), CROSSFADE_DURATION, nextIdx);
-        
-        // Draw Overlay Text for next slide during cross-fade
         drawTextOverlay(ctx, canvas, propertyDetails, nextIdx);
         ctx.restore();
       }
@@ -180,26 +236,40 @@ export const VideoPlayer: React.FC = () => {
 
       setCurrentTime((prev) => {
         const nextTime = prev + elapsed;
-        if (nextTime >= totalDuration) {
-          return 0; // Loop presentation
+        
+        if (isExporting) {
+          setExportProgress((nextTime / totalDuration) * 100);
+          if (nextTime >= totalDuration) {
+            // Export finished!
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              mediaRecorderRef.current.stop();
+            }
+            setPlaying(false);
+            return totalDuration;
+          }
+        } else if (nextTime >= totalDuration) {
+          return 0; // Loop presentation in normal mode
         }
+        
         return nextTime;
       });
 
-      animationRef.current = requestAnimationFrame(loop);
+      if (playing) {
+        animationRef.current = requestAnimationFrame(loop);
+      }
     };
 
     if (playing) {
-      lastTimeRef.current = null;
       animationRef.current = requestAnimationFrame(loop);
     } else {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      lastTimeRef.current = null;
     }
 
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [playing, totalDuration]);
+  }, [playing, totalDuration, isExporting]);
 
   // Helper: Draw image with Ken Burns scale and pan
   const drawKenBurnsImage = (
@@ -211,14 +281,11 @@ export const VideoPlayer: React.FC = () => {
     index: number
   ) => {
     const progress = time / duration;
-    
-    // Zoom direction alternates per slide
     const zoomIn = index % 2 === 0;
     const startScale = zoomIn ? 1.0 : 1.15;
     const endScale = zoomIn ? 1.15 : 1.0;
     const currentScale = startScale + (endScale - startScale) * progress;
 
-    // Pan direction alternates
     const startX = zoomIn ? 0 : -30;
     const endX = zoomIn ? -30 : 0;
     const currentX = startX + (endX - startX) * progress;
@@ -228,7 +295,6 @@ export const VideoPlayer: React.FC = () => {
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
 
-    // Cover fit logic
     const scaleX = canvasWidth / imgWidth;
     const scaleY = canvasHeight / imgHeight;
     const baseScale = Math.max(scaleX, scaleY);
@@ -251,22 +317,17 @@ export const VideoPlayer: React.FC = () => {
     const address = details.address || 'Premium Listing';
     const features = details.features || [];
     
-    // Gradient overlay at bottom
     const gradient = ctx.createLinearGradient(0, canvas.height - 180, 0, canvas.height);
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
     gradient.addColorStop(1, 'rgba(0,0,0,0.85)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, canvas.height - 180, canvas.width, 180);
 
-    // Left Align Bottom Text
     ctx.textAlign = 'left';
-    
-    // Main address/title line
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 28px Outfit, sans-serif';
     ctx.fillText(address, 48, canvas.height - 70);
 
-    // Subtitle / Specs line
     ctx.fillStyle = '#059669'; // Emerald
     ctx.font = 'semibold 16px Inter, sans-serif';
     
@@ -283,13 +344,13 @@ export const VideoPlayer: React.FC = () => {
   };
 
   const handleTimelineChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isExporting) return;
     const nextPercentage = parseFloat(e.target.value);
     setCurrentTime((nextPercentage / 100) * totalDuration);
   };
 
   return (
     <div className="flex flex-col bg-neutral-900 border border-neutral-800 rounded-2xl p-6 overflow-hidden">
-      {/* Video Canvas Container */}
       <div className="relative aspect-video w-full bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-850">
         <canvas
           ref={canvasRef}
@@ -298,15 +359,15 @@ export const VideoPlayer: React.FC = () => {
           className="w-full h-full object-contain"
         />
         
-        {/* Live Playback indicator */}
-        <div className="absolute top-4 right-4 px-3 py-1 bg-black/60 backdrop-blur rounded-full text-xs font-semibold tracking-wider text-emerald-400 border border-emerald-500/20 uppercase">
-          Live Render
-        </div>
+        {isExporting && (
+          <div className="absolute top-4 right-4 px-3 py-1 bg-red-500/20 backdrop-blur rounded-full text-xs font-semibold tracking-wider text-red-400 border border-red-500/30 flex items-center gap-2 uppercase">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            Exporting...
+          </div>
+        )}
       </div>
 
-      {/* Video HUD Control Panel */}
-      <div className="mt-6 space-y-4">
-        {/* Timeline Slider */}
+      <div className={`mt-6 space-y-4 ${isExporting ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex items-center gap-4">
           <span className="text-xs font-semibold text-neutral-400 select-none">
             {new Date(currentTime).toISOString().substr(14, 5)}
@@ -325,9 +386,7 @@ export const VideoPlayer: React.FC = () => {
           </span>
         </div>
 
-        {/* Buttons and Settings */}
         <div className="flex justify-between items-center pt-2">
-          {/* Main Playback Group */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => setPlaying(!playing)}
@@ -343,7 +402,6 @@ export const VideoPlayer: React.FC = () => {
             </button>
           </div>
 
-          {/* Soundtrack selector */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-2 rounded-lg text-sm text-neutral-450">
               <Music className="w-4 h-4 text-emerald-500" />
@@ -357,7 +415,6 @@ export const VideoPlayer: React.FC = () => {
               </select>
             </div>
 
-            {/* Mute toggle */}
             <button
               onClick={() => setMuted(!muted)}
               disabled={audioTrack === 'none'}

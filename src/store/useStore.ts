@@ -32,12 +32,18 @@ export interface CloverState {
   setGeneratedScript: (script: string) => void;
   voiceProfile: string;
   setVoiceProfile: (profile: string) => void;
+  elevenLabsApiKey: string;
+  setElevenLabsApiKey: (key: string) => void;
 
   // UI State
   isWizardOpen: boolean;
   setWizardOpen: (isOpen: boolean) => void;
   isExporting: boolean;
   setExporting: (isExporting: boolean) => void;
+  exportProgress: number;
+  setExportProgress: (progress: number) => void;
+  videoBlobUrl: string | null;
+  setVideoBlobUrl: (url: string | null) => void;
 }
 
 const defaultProperty: PropertyDetails = {
@@ -71,12 +77,22 @@ export const useStore = create<CloverState>((set) => ({
   generatedScript: '',
   setGeneratedScript: (script) => set({ generatedScript: script }),
   
-  voiceProfile: 'Warm & Inviting',
+  voiceProfile: 'Warm & Inviting (Rachel)',
   setVoiceProfile: (profile) => set({ voiceProfile: profile }),
+
+  elevenLabsApiKey: localStorage.getItem('elevenLabsApiKey') || '',
+  setElevenLabsApiKey: (key) => {
+    localStorage.setItem('elevenLabsApiKey', key);
+    set({ elevenLabsApiKey: key });
+  },
 
   isWizardOpen: false,
   setWizardOpen: (isOpen) => set({ isWizardOpen: isOpen }),
 
   isExporting: false,
   setExporting: (isExporting) => set({ isExporting }),
+  exportProgress: 0,
+  setExportProgress: (progress) => set({ exportProgress: progress }),
+  videoBlobUrl: null,
+  setVideoBlobUrl: (url) => set({ videoBlobUrl: url }),
 }));
