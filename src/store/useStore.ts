@@ -44,6 +44,8 @@ export interface CloverState {
   setExportProgress: (progress: number) => void;
   videoBlobUrl: string | null;
   setVideoBlobUrl: (url: string | null) => void;
+  isAuthenticated: boolean;
+  setAuthenticated: (auth: boolean) => void;
 }
 
 const defaultProperty: PropertyDetails = {
@@ -95,4 +97,10 @@ export const useStore = create<CloverState>((set) => ({
   setExportProgress: (progress) => set({ exportProgress: progress }),
   videoBlobUrl: null,
   setVideoBlobUrl: (url) => set({ videoBlobUrl: url }),
+
+  isAuthenticated: localStorage.getItem('cloverAuth') === 'true',
+  setAuthenticated: (auth) => {
+    localStorage.setItem('cloverAuth', auth.toString());
+    set({ isAuthenticated: auth });
+  },
 }));

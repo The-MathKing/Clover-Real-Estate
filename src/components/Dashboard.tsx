@@ -85,8 +85,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectProperty }) => {
         {/* Listings Section */}
         <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold font-heading text-white">Active Properties</h2>
-            <span className="text-sm text-neutral-400 font-medium">{mockProperties.length} listings</span>
+            <h2 className="text-2xl font-bold font-heading text-white">Example Videos</h2>
+            <span className="text-sm text-neutral-400 font-medium">{mockProperties.length} examples</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

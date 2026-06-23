@@ -135,7 +135,7 @@ export const VideoPlayer: React.FC = () => {
       synthRef.current?.stop();
 
       const canvas = canvasRef.current;
-      const stream = canvas.captureStream(30);
+      const canvasStream = canvas.captureStream(30);
 
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const dest = audioCtx.createMediaStreamDestination();
@@ -146,21 +146,36 @@ export const VideoPlayer: React.FC = () => {
         exportSynth.setVolume(0.5);
       }
 
-      // Merge audio track into video stream
-      dest.stream.getAudioTracks().forEach(track => {
-        stream.addTrack(track);
-      });
+      // Create a unified stream with explicit track merging for cross-browser support
+      const combinedTracks = [
+        ...canvasStream.getVideoTracks(),
+        ...dest.stream.getAudioTracks()
+      ];
+      const combinedStream = new MediaStream(combinedTracks);
 
       const chunks: BlobPart[] = [];
-      const options = { mimeType: 'video/webm;codecs=vp8,opus' };
-      const mediaRecorder = new MediaRecorder(stream, options);
+      
+      // Determine the best supported MIME type
+      let mimeType = '';
+      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+        mimeType = 'video/webm;codecs=vp8,opus';
+      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+        mimeType = 'video/webm';
+      } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/mp4'; // Fallback for Safari
+      }
+
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(combinedStream, options);
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
+        // Use the resolved mimeType, or default to video/webm
+        const finalMimeType = mimeType || 'video/webm';
+        const blob = new Blob(chunks, { type: finalMimeType });
         const url = URL.createObjectURL(blob);
         setVideoBlobUrl(url);
         audioCtx.close();

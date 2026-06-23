@@ -14,7 +14,12 @@ export const ExportModal: React.FC = () => {
     if (!videoBlobUrl) return;
     const link = document.createElement('a');
     link.href = videoBlobUrl;
-    link.download = 'clover_presentation.webm';
+    
+    // Guess extension based on likely format
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const extension = isSafari ? 'mp4' : 'webm';
+    
+    link.download = `clover_presentation.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -32,7 +37,7 @@ export const ExportModal: React.FC = () => {
     setVideoBlobUrl(null);
   };
 
-  let statusMessage = 'Initializing WebM rendering engine...';
+  let statusMessage = 'Initializing Video rendering engine...';
   if (exportProgress > 0 && exportProgress < 100) {
     statusMessage = `Stitching canvas frames and merging AI Audio...`;
   } else if (isFinished) {
@@ -51,7 +56,7 @@ export const ExportModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-lg font-bold font-heading text-white">Export Presentation</h3>
-              <p className="text-xs text-neutral-450">Real-time local WebM encoding</p>
+              <p className="text-xs text-neutral-450">Real-time local video encoding</p>
             </div>
           </div>
           <button
@@ -81,7 +86,7 @@ export const ExportModal: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-xs font-mono text-neutral-550">
-                  {exportProgress === 0 ? 'STARTING_MEDIA_RECORDER' : 'ENCODING_VP8_WEBM...'}
+                  {exportProgress === 0 ? 'STARTING_MEDIA_RECORDER' : 'ENCODING_VIDEO...'}
                 </span>
               </div>
             </div>
@@ -96,7 +101,7 @@ export const ExportModal: React.FC = () => {
             <div>
               <h4 className="text-xl font-bold text-white mb-2">Your Video is Ready!</h4>
               <p className="text-sm text-neutral-400 max-w-sm mx-auto">
-                The property presentation has been fully stitched and encoded to WebM, ready for playback.
+                The property presentation has been fully stitched and encoded to video, ready for playback.
               </p>
             </div>
 
@@ -106,7 +111,7 @@ export const ExportModal: React.FC = () => {
                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg shadow-lg shadow-emerald-950/20 transition-all active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" />
-                Download WebM
+                Download Video
               </button>
               <button
                 onClick={handleCopyLink}
