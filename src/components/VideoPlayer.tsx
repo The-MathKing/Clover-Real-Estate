@@ -91,8 +91,8 @@ export const VideoPlayer: React.FC = () => {
   const lastTimeRef = useRef<number | null>(null);
   const loadedImagesRef = useRef<{ [url: string]: HTMLImageElement }>({});
 
-  const SLIDE_DURATION = 4000; // 4 seconds total slot per image
-  const CROSSFADE_DURATION = 1000; // 1 second cross-fade
+  const SLIDE_DURATION = 5000; // 5 seconds total slot per image
+  const CROSSFADE_DURATION = 1500; // 1.5 second cross-fade
   const totalDuration = images.length * SLIDE_DURATION;
 
   // Preload all images
@@ -230,7 +230,10 @@ export const VideoPlayer: React.FC = () => {
 
       const isCrossFading = slideTime > (SLIDE_DURATION - CROSSFADE_DURATION);
       if (isCrossFading && nextImg) {
-        const transitionProgress = (slideTime - (SLIDE_DURATION - CROSSFADE_DURATION)) / CROSSFADE_DURATION;
+        let transitionProgress = (slideTime - (SLIDE_DURATION - CROSSFADE_DURATION)) / CROSSFADE_DURATION;
+        // Smoothstep easing for a much better, cinematic blend
+        transitionProgress = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
+        
         ctx.save();
         ctx.globalAlpha = transitionProgress;
         drawKenBurnsImage(ctx, canvas, nextImg, slideTime - (SLIDE_DURATION - CROSSFADE_DURATION), CROSSFADE_DURATION, nextIdx);
