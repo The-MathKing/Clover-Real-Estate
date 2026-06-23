@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { mockProperties } from '../mockData';
 
 export interface PropertyImage {
   id: string;
@@ -47,7 +46,9 @@ export interface CloverState {
   setVideoBlobUrl: (url: string | null) => void;
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
-  propertiesList: any[];
+  activeTab: 'demo' | 'examples' | 'my-videos' | 'pricing';
+  setActiveTab: (tab: 'demo' | 'examples' | 'my-videos' | 'pricing') => void;
+  userProperties: any[];
   addPropertyToList: (property: any) => void;
 }
 
@@ -107,8 +108,11 @@ export const useStore = create<CloverState>((set) => ({
     set({ isAuthenticated: auth });
   },
 
-  propertiesList: mockProperties,
+  activeTab: 'demo',
+  setActiveTab: (tab) => set({ activeTab: tab }),
+
+  userProperties: [],
   addPropertyToList: (property) => set((state) => ({ 
-    propertiesList: [property, ...state.propertiesList] 
+    userProperties: [property, ...state.userProperties] 
   })),
 }));

@@ -84,6 +84,7 @@ export const WizardModal: React.FC = () => {
     };
 
     useStore.getState().addPropertyToList(newProperty);
+    useStore.getState().setActiveTab('my-videos');
 
     setWizardOpen(false);
     setStep(1);
